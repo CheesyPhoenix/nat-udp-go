@@ -3,6 +3,7 @@ package src
 import (
 	"fmt"
 	"net"
+	"sync"
 )
 
 func Server() {
@@ -19,6 +20,9 @@ func Server() {
 
 	fmt.Println("Listening on 0.0.0.0:12345")
 
+	//tcpConnections := make(map[net.Addr]*net.TCPConn)
+	tcpConnections := new(sync.Map)
+
 	for {
 		buffer := make([]byte, 1024)
 		bytesRead, addr, err := conn.ReadFrom(buffer)
@@ -27,35 +31,45 @@ func Server() {
 		}
 		fmt.Println("Read ", bytesRead, " bytes from udp client")
 
-		go func() {
-			tcpClientConn, err := net.DialTCP("tcp4", nil, &net.TCPAddr{
+		val, ok := tcpConnections.Load(addr.String())
+		var tcpClientConn *net.TCPConn
+		if !ok {
+			tcpClientConn, err = net.DialTCP("tcp4", nil, &net.TCPAddr{
 				IP:   net.IPv4(127, 0, 0, 1),
-				Port: 25565,
+				Port: 25566,
 				Zone: "",
 			})
 			if err != nil {
 				fmt.Println(err)
 				return
 			}
-			defer tcpClientConn.Close()
 
-			tcpClientConn.Write(buffer[0:bytesRead])
-			if bytesRead > 0 {
-				fmt.Println("From upd client: ", string(buffer))
-			}
+			go func() {
+				for {
+					buffer = make([]byte, 1024)
+					bytesRead, err = tcpClientConn.Read(buffer)
+					fmt.Println("Read ", bytesRead, " bytes from tcp server")
+					conn.WriteTo(buffer[0:bytesRead], addr)
 
-			for {
-				buffer = make([]byte, 1024)
-				bytesRead, err = tcpClientConn.Read(buffer)
-				if err != nil {
-					fmt.Println("Got error reading from connection: ", err)
+					if err != nil {
+						fmt.Println("Got error reading from connection: ", err)
+						if err.Error() == "EOF" {
+							tcpClientConn.Close()
+							tcpConnections.Delete(addr.String())
+							return
+						}
+					}
 				}
-				fmt.Println("Read ", bytesRead, " bytes from tcp server")
-				conn.WriteTo(buffer[0:bytesRead], addr)
-				if bytesRead == 0 {
-					break
-				}
-			}
-		}()
+			}()
+
+			tcpConnections.Store(addr.String(), &tcpClientConn)
+		} else {
+			tcpClientConn = *val.(**net.TCPConn)
+		}
+
+		tcpClientConn.Write(buffer[0:bytesRead])
+		if bytesRead > 0 {
+			fmt.Println("From upd client: ", string(buffer))
+		}
 	}
 }

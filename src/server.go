@@ -7,6 +7,17 @@ import (
 )
 
 func Server() {
+	holeConn, _ := net.DialUDP("udp4", &net.UDPAddr{
+		IP:   net.IPv4(0, 0, 0, 0),
+		Port: 12345,
+		Zone: "",
+	}, &net.UDPAddr{
+		IP:   net.IPv4(89, 10, 217, 140),
+		Port: 54250,
+		Zone: "",
+	})
+	holeConn.Close()
+
 	conn, err := net.ListenUDP("udp4", &net.UDPAddr{
 		IP:   net.IPv4(0, 0, 0, 0),
 		Port: 12345,

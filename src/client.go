@@ -17,9 +17,13 @@ func Client() {
 	}
 	defer tcpServerConn.Close()
 
-	udpClientConn, err := net.DialUDP("udp4", nil, &net.UDPAddr{
+	udpClientConn, err := net.DialUDP("udp4", &net.UDPAddr{
 		IP:   net.IPv4(0, 0, 0, 0),
-		Port: 12345,
+		Port: 12344,
+		Zone: "",
+	}, &net.UDPAddr{
+		IP:   net.IPv4(89, 10, 217, 140),
+		Port: 38593,
 		Zone: "",
 	})
 	if err != nil {

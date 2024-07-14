@@ -12,8 +12,13 @@ type IPAndPort struct {
 	Port int
 }
 
-func GetIPAndPort() (*IPAndPort, error) {
-	conn, err := net.Dial("udp4", "stun.l.google.com:19302")
+func GetIPAndPort(localAddr *net.UDPAddr) (*IPAndPort, error) {
+	stunAddr, err := net.ResolveUDPAddr("udp4", "stun.l.google.com:19302")
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := net.DialUDP("udp4", localAddr, stunAddr)
 	if err != nil {
 		return nil, err
 	}

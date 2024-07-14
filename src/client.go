@@ -5,10 +5,13 @@ import (
 	"net"
 )
 
+const ClientUDPPort = 12344
+const ClientTCPPort = 12346
+
 func Client() {
 	tcpServerConn, err := net.ListenTCP("tcp4", &net.TCPAddr{
 		IP:   net.IPv4(0, 0, 0, 0),
-		Port: 12346,
+		Port: ClientTCPPort,
 		Zone: "",
 	})
 	if err != nil {
@@ -19,11 +22,11 @@ func Client() {
 
 	udpClientConn, err := net.DialUDP("udp4", &net.UDPAddr{
 		IP:   net.IPv4(0, 0, 0, 0),
-		Port: 12344,
+		Port: ClientUDPPort,
 		Zone: "",
 	}, &net.UDPAddr{
 		IP:   net.IPv4(89, 10, 217, 140),
-		Port: 38593,
+		Port: ServerUDPPort,
 		Zone: "",
 	})
 	if err != nil {
@@ -32,7 +35,12 @@ func Client() {
 	}
 	defer udpClientConn.Close()
 
-	fmt.Println("Listening on 0.0.0.0:12346")
+	fmt.Printf("Listening on 0.0.0.0:%v\n", ClientTCPPort)
+
+	_, err = udpClientConn.Write([]byte("UPD hole punch"))
+	if err != nil {
+		fmt.Println("Hole punch err:", err.Error())
+	}
 
 	tcpConnections := make(chan net.Conn, 100)
 
@@ -50,7 +58,7 @@ func Client() {
 
 	for {
 		conn := <-tcpConnections
-		fmt.Println("Handeling connection")
+		fmt.Println("Handling connection")
 
 		stop := make(chan bool, 10)
 

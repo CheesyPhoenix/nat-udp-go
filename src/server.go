@@ -6,21 +6,13 @@ import (
 	"sync"
 )
 
-func Server() {
-	holeConn, _ := net.DialUDP("udp4", &net.UDPAddr{
-		IP:   net.IPv4(0, 0, 0, 0),
-		Port: 12345,
-		Zone: "",
-	}, &net.UDPAddr{
-		IP:   net.IPv4(89, 10, 217, 140),
-		Port: 54250,
-		Zone: "",
-	})
-	holeConn.Close()
+const ServerUDPPort = 12345
+const ServerTCPPort = 4173
 
+func Server() {
 	conn, err := net.ListenUDP("udp4", &net.UDPAddr{
 		IP:   net.IPv4(0, 0, 0, 0),
-		Port: 12345,
+		Port: ServerUDPPort,
 		Zone: "",
 	})
 	if err != nil {
@@ -29,7 +21,17 @@ func Server() {
 	}
 	defer conn.Close()
 
-	fmt.Println("Listening on 0.0.0.0:12345")
+	_, err = conn.WriteToUDP([]byte("UPD hole punch"), &net.UDPAddr{
+		IP:   net.IPv4(89, 10, 217, 140),
+		Port: ClientUDPPort,
+		Zone: "",
+	})
+	if err != nil {
+		fmt.Println("Hole punch err:", err.Error())
+	}
+
+	fmt.Printf("Listening on 0.0.0.0:%v\n", ServerUDPPort)
+	fmt.Printf("Forwarding 127.0.0.1:%v\n", ServerTCPPort)
 
 	//tcpConnections := make(map[net.Addr]*net.TCPConn)
 	tcpConnections := new(sync.Map)
@@ -47,7 +49,7 @@ func Server() {
 		if !ok {
 			tcpClientConn, err = net.DialTCP("tcp4", nil, &net.TCPAddr{
 				IP:   net.IPv4(127, 0, 0, 1),
-				Port: 25566,
+				Port: ServerTCPPort,
 				Zone: "",
 			})
 			if err != nil {

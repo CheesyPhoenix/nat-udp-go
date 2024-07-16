@@ -8,7 +8,7 @@ import (
 const ClientUDPPort = 12344
 const ClientTCPPort = 12346
 
-func Client() {
+func Client(serverAddr net.UDPAddr) {
 	tcpServerConn, err := net.ListenTCP("tcp4", &net.TCPAddr{
 		IP:   net.IPv4(0, 0, 0, 0),
 		Port: ClientTCPPort,
@@ -24,12 +24,7 @@ func Client() {
 		IP:   net.IPv4(0, 0, 0, 0),
 		Port: ClientUDPPort,
 		Zone: "",
-	}, &net.UDPAddr{
-		IP: net.IPv4(89, 10, 217, 140),
-		//IP:   net.IPv4(0, 0, 0, 0),
-		Port: ServerUDPPort,
-		Zone: "",
-	})
+	}, &serverAddr)
 	if err != nil {
 		fmt.Println(err)
 		return

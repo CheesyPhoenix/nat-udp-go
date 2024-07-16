@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/cheesyphoenix/nat-udp-go/src"
+	"github.com/cheesyphoenix/nat-udp-go/src/tui"
 )
 
 // TODO: Proper interface + stop sending hole-punch requests when connected
@@ -38,10 +39,15 @@ func main() {
 			return
 		}
 		fmt.Println("---------------------------")
-		fmt.Println("IP:", ipAndPort.IP)
-		fmt.Println("Port:", ipAndPort.Port)
+		fmt.Printf("Your address: %v:%v\n", ipAndPort.IP, ipAndPort.Port)
 		fmt.Println("---------------------------")
 
-		src.Client()
+		serverAddr, err := tui.PromptForAddress()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		src.Client(*serverAddr)
 	}
 }

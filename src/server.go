@@ -22,7 +22,7 @@ func Server() {
 	defer conn.Close()
 
 	_, err = conn.WriteToUDP([]byte("UPD hole punch"), &net.UDPAddr{
-		IP:   net.IPv4(89, 10, 217, 140),
+		IP:   net.IPv4(141, 147, 95, 100),
 		Port: ClientUDPPort,
 		Zone: "",
 	})

@@ -25,7 +25,8 @@ func Client() {
 		Port: ClientUDPPort,
 		Zone: "",
 	}, &net.UDPAddr{
-		IP:   net.IPv4(89, 10, 217, 140),
+		IP: net.IPv4(89, 10, 217, 140),
+		//IP:   net.IPv4(0, 0, 0, 0),
 		Port: ServerUDPPort,
 		Zone: "",
 	})

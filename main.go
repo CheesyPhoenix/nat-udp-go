@@ -8,6 +8,8 @@ import (
 	"github.com/cheesyphoenix/nat-udp-go/src"
 )
 
+// TODO: Proper interface + stop sending hole-punch requests when connected
+
 func main() {
 	if os.Args[1] == "server" {
 		ipAndPort, err := src.GetIPAndPort(&net.UDPAddr{

@@ -3,10 +3,14 @@ package src
 import (
 	"fmt"
 	"net"
+	"time"
 )
 
 const ClientUDPPort = 12344
 const ClientTCPPort = 12346
+
+const KeepAliveMessage = "UDP Hole Punch"
+const KeepAliveMessageLength = len(KeepAliveMessage)
 
 func Client(serverAddr net.UDPAddr) {
 	tcpServerConn, err := net.ListenTCP("tcp4", &net.TCPAddr{
@@ -33,10 +37,16 @@ func Client(serverAddr net.UDPAddr) {
 
 	fmt.Printf("Listening on 0.0.0.0:%v\n", ClientTCPPort)
 
-	_, err = udpClientConn.Write([]byte("UPD hole punch"))
-	if err != nil {
-		fmt.Println("Hole punch err:", err.Error())
-	}
+	go func() {
+		for {
+			_, err = udpClientConn.Write([]byte("UPD hole punch"))
+			if err != nil {
+				fmt.Println("Hole punch err:", err.Error())
+			}
+
+			time.Sleep(time.Second * 5)
+		}
+	}()
 
 	tcpConnections := make(chan net.Conn, 100)
 
@@ -105,6 +115,11 @@ func Client(serverAddr net.UDPAddr) {
 						break
 					}
 				}
+				if bytesRead == KeepAliveMessageLength && string(buffer) == KeepAliveMessage {
+					fmt.Println("Recieved Keep-Alive message")
+					continue
+				}
+
 				fmt.Println("Read ", bytesRead, " bytes from udp server")
 				if bytesRead == 0 {
 					break

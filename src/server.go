@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 )
 
 const ServerUDPPort = 12345
@@ -21,14 +22,20 @@ func Server() {
 	}
 	defer conn.Close()
 
-	_, err = conn.WriteToUDP([]byte("UPD hole punch"), &net.UDPAddr{
-		IP:   net.IPv4(141, 147, 95, 100),
-		Port: ClientUDPPort,
-		Zone: "",
-	})
-	if err != nil {
-		fmt.Println("Hole punch err:", err.Error())
-	}
+	go func() {
+		for {
+			_, err = conn.WriteToUDP([]byte("UPD hole punch"), &net.UDPAddr{
+				IP:   net.IPv4(141, 147, 95, 100),
+				Port: ClientUDPPort,
+				Zone: "",
+			})
+			if err != nil {
+				fmt.Println("Hole punch err:", err.Error())
+			}
+
+			time.Sleep(time.Second * 5)
+		}
+	}()
 
 	fmt.Printf("Listening on 0.0.0.0:%v\n", ServerUDPPort)
 	fmt.Printf("Forwarding 127.0.0.1:%v\n", ServerTCPPort)
@@ -41,6 +48,10 @@ func Server() {
 		bytesRead, addr, err := conn.ReadFrom(buffer)
 		if err != nil {
 			fmt.Println("Got error reading from connection: ", err)
+		}
+		if bytesRead == KeepAliveMessageLength && string(buffer) == KeepAliveMessage {
+			fmt.Println("Recieved Keep-Alive message")
+			continue
 		}
 		fmt.Println("Read ", bytesRead, " bytes from udp client")
 

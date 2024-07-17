@@ -12,7 +12,9 @@ import (
 // TODO: Proper interface + stop sending hole-punch requests when connected
 
 func main() {
-	if os.Args[1] == "server" {
+	if len(os.Args) < 2 {
+		tui.StartTUI()
+	} else if os.Args[1] == "server" {
 		ipAndPort, err := src.GetIPAndPort(&net.UDPAddr{
 			IP:   net.IPv4(0, 0, 0, 0),
 			Port: src.ServerUDPPort,
@@ -23,8 +25,7 @@ func main() {
 			return
 		}
 		fmt.Println("---------------------------")
-		fmt.Println("IP:", ipAndPort.IP)
-		fmt.Println("Port:", ipAndPort.Port)
+		fmt.Printf("Your address: %v:%v\n", ipAndPort.IP, ipAndPort.Port)
 		fmt.Println("---------------------------")
 
 		src.Server()

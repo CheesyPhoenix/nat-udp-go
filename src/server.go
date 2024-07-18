@@ -1,7 +1,6 @@
 package src
 
 import (
-	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -10,35 +9,33 @@ import (
 const ServerUDPPort = 12345
 const ServerTCPPort = 4173
 
-func Server() {
+func StartHolePunch(conn net.UDPConn, addr net.UDPAddr, logLn func(string, ...any)) {
+	go func() {
+		for {
+			_, err := conn.WriteToUDP([]byte(KeepAliveMessage), &addr)
+			if err != nil {
+				logLn("Hole punch err: %v", err.Error())
+			}
+
+			time.Sleep(time.Second * 5)
+		}
+	}()
+}
+
+func Server(logLn func(string, ...any)) {
 	conn, err := net.ListenUDP("udp4", &net.UDPAddr{
 		IP:   net.IPv4(0, 0, 0, 0),
 		Port: ServerUDPPort,
 		Zone: "",
 	})
 	if err != nil {
-		fmt.Println(err)
+		logLn("%v", err.Error())
 		return
 	}
 	defer conn.Close()
 
-	go func() {
-		for {
-			_, err = conn.WriteToUDP([]byte("UPD hole punch"), &net.UDPAddr{
-				IP:   net.IPv4(141, 147, 95, 100),
-				Port: ClientUDPPort,
-				Zone: "",
-			})
-			if err != nil {
-				fmt.Println("Hole punch err:", err.Error())
-			}
-
-			time.Sleep(time.Second * 5)
-		}
-	}()
-
-	fmt.Printf("Listening on 0.0.0.0:%v\n", ServerUDPPort)
-	fmt.Printf("Forwarding 127.0.0.1:%v\n", ServerTCPPort)
+	logLn("Listening on 0.0.0.0:%v", ServerUDPPort)
+	logLn("Forwarding 127.0.0.1:%v", ServerTCPPort)
 
 	//tcpConnections := make(map[net.Addr]*net.TCPConn)
 	tcpConnections := new(sync.Map)
@@ -47,13 +44,13 @@ func Server() {
 		buffer := make([]byte, 1024)
 		bytesRead, addr, err := conn.ReadFrom(buffer)
 		if err != nil {
-			fmt.Println("Got error reading from connection: ", err)
+			logLn("Got error reading from connection: %v", err.Error())
 		}
 		if bytesRead == KeepAliveMessageLength && string(buffer) == KeepAliveMessage {
-			fmt.Println("Recieved Keep-Alive message")
+			logLn("Received Keep-Alive message")
 			continue
 		}
-		fmt.Println("Read ", bytesRead, " bytes from udp client")
+		logLn("Read %v bytes from udp client", bytesRead)
 
 		val, ok := tcpConnections.Load(addr.String())
 		var tcpClientConn *net.TCPConn
@@ -64,7 +61,7 @@ func Server() {
 				Zone: "",
 			})
 			if err != nil {
-				fmt.Println(err)
+				logLn("%v", err.Error())
 				return
 			}
 
@@ -72,11 +69,11 @@ func Server() {
 				for {
 					buffer = make([]byte, 1024)
 					bytesRead, err = tcpClientConn.Read(buffer)
-					fmt.Println("Read ", bytesRead, " bytes from tcp server")
+					logLn("Read %v bytes from tcp server", bytesRead)
 					conn.WriteTo(buffer[0:bytesRead], addr)
 
 					if err != nil {
-						fmt.Println("Got error reading from connection: ", err)
+						logLn("Got error reading from connection: %v", err.Error())
 						if err.Error() == "EOF" {
 							tcpClientConn.Close()
 							tcpConnections.Delete(addr.String())
@@ -93,7 +90,7 @@ func Server() {
 
 		tcpClientConn.Write(buffer[0:bytesRead])
 		if bytesRead > 0 {
-			fmt.Println("From upd client: ", string(buffer))
+			logLn("From upd client: %v", string(buffer))
 		}
 	}
 }

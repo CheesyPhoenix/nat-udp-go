@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/cheesyphoenix/nat-udp-go/src"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -43,7 +44,8 @@ func StartTUI() {
 
 	logView := tview.NewTextView()
 	logView.SetBorder(true).SetTitle("Log")
-	logView.Write([]byte("Hello Log\nNew Line"))
+	logView.SetChangedFunc(func() { app.Draw() })
+	logView.Write([]byte{})
 
 	actionPages := tview.NewPages()
 
@@ -51,16 +53,69 @@ func StartTUI() {
 	actionPages.AddAndSwitchToPage("start-list", list, true)
 	list.
 		AddItem("Start Client", "", 'c', func() {
-			form := tview.NewForm().
-				AddInputField("Server address", "", 22, nil, nil).
-				AddButton("Save", nil).
+			addressStr := ""
+
+			form := tview.NewForm()
+			form.
+				AddInputField("Server address", addressStr, 22, nil, func(text string) { addressStr = text }).
+				AddButton("Save", func() {
+					addr, err := net.ResolveUDPAddr("udp4", addressStr)
+					if err != nil {
+						app.SetFocus(form.GetFormItemByLabel("Server address"))
+						logView.Write([]byte(err.Error() + "\n"))
+						return
+					}
+
+					clientPage := tview.NewFlex()
+					clientPage.SetBorder(true).SetTitle("Client running")
+
+					clientInfo := tview.NewTextView()
+					clientInfo.Write([]byte(fmt.Sprintf("Server IP: %v\n", addr.IP)))
+					clientInfo.Write([]byte(fmt.Sprintf("Server port: %v\n", addr.Port)))
+
+					clientActions := tview.NewList()
+					clientActions.AddItem("Quit", "Press to exit", 'q', func() {
+						app.Stop()
+					})
+
+					clientPage.AddItem(clientInfo, 0, 1, false)
+					clientPage.AddItem(clientActions, 0, 1, true)
+
+					actionPages.AddAndSwitchToPage("client-page", clientPage, true)
+
+					go func() {
+						src.Client(*addr, func(format string, a ...any) {
+							logView.Write([]byte(fmt.Sprintf(format, a...) + "\n"))
+						})
+						app.Stop()
+					}()
+				}).
 				AddButton("Cancel", func() {
 					actionPages.SwitchToPage("start-list")
 				})
 			form.SetBorder(true).SetTitle("Start Client").SetTitleAlign(tview.AlignLeft)
 			actionPages.AddAndSwitchToPage("start-client-form", form, true)
 		}).
-		AddItem("Start Server", "", 's', nil).
+		AddItem("Start Server", "", 's', func() {
+			serverPage := tview.NewFlex()
+			serverPage.SetBorder(true).SetTitle("Server running")
+
+			serverInfo := tview.NewTextView()
+
+			serverActions := tview.NewList()
+
+			serverPage.AddItem(serverInfo, 0, 1, false)
+			serverPage.AddItem(serverActions, 0, 1, true)
+
+			actionPages.AddAndSwitchToPage("server-page", serverPage, true)
+
+			go func() {
+				src.Server(func(format string, a ...any) {
+					logView.Write([]byte(fmt.Sprintf(format, a...) + "\n"))
+				})
+				app.Stop()
+			}()
+		}).
 		AddItem("Quit", "Press to exit", 'q', func() {
 			app.Stop()
 		}).SetBorder(true)

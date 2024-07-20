@@ -30,7 +30,7 @@ jobs:
       run: go get .
       
     - name: Build
-      run: CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o a.out -v ./...
+      run: CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o a.out .
 
     - name: Upload binaries
       uses: actions/upload-artifact@v4

@@ -1,12 +1,11 @@
 package src
 
 import (
-	"fmt"
 	"net"
 	"time"
 )
 
-const ClientUDPPort = 12344
+const ClientUDPPort = 12345
 const ClientTCPPort = 12346
 
 const KeepAliveMessage = "UDP Hole Punch"
@@ -39,7 +38,7 @@ func Client(serverAddr net.UDPAddr, logLn func(string, ...any)) {
 
 	go func() {
 		for {
-			_, err = udpClientConn.Write([]byte(KeepAliveMessage))
+			_, err := udpClientConn.Write([]byte(KeepAliveMessage))
 			if err != nil {
 				logLn("Hole punch err: %v", err.Error())
 			}
@@ -58,13 +57,13 @@ func Client(serverAddr net.UDPAddr, logLn func(string, ...any)) {
 				continue
 			}
 			tcpConnections <- conn
-			fmt.Println("New connection")
+			logLn("New connection")
 		}
 	}()
 
 	for {
 		conn := <-tcpConnections
-		fmt.Println("Handling connection")
+		logLn("Handling connection")
 
 		stop := make(chan bool, 10)
 
@@ -87,7 +86,7 @@ func Client(serverAddr net.UDPAddr, logLn func(string, ...any)) {
 						break
 					}
 				}
-				logLn("Read %v bytes from tcp client", err.Error())
+				logLn("Read %v bytes from tcp client", bytesRead)
 				if bytesRead == 0 {
 					break
 				}
@@ -115,12 +114,12 @@ func Client(serverAddr net.UDPAddr, logLn func(string, ...any)) {
 						break
 					}
 				}
-				if bytesRead == KeepAliveMessageLength && string(buffer) == KeepAliveMessage {
+				if bytesRead == KeepAliveMessageLength && string(buffer[0:bytesRead]) == KeepAliveMessage {
 					logLn("Received keep-alive message")
 					continue
 				}
 
-				logLn("Read %v bytes from udp server", err.Error())
+				logLn("Read %v bytes from udp server", bytesRead)
 				if bytesRead == 0 {
 					break
 				}
@@ -133,6 +132,7 @@ func Client(serverAddr net.UDPAddr, logLn func(string, ...any)) {
 		<-stop
 		stop <- true
 
+		conn.Write([]byte{})
 		conn.Close()
 		logLn("Connection closed")
 	}

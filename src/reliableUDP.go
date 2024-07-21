@@ -48,7 +48,7 @@ func (header *Header) ToBytes() []byte {
 
 func ParseHeader(bytes []byte) (*Header, error) {
 	if len(bytes) < HeaderSize {
-		return nil, fmt.Errorf("Too few bytes supplied. A minimum of %v bytes are required", HeaderSize)
+		return nil, fmt.Errorf("too few bytes supplied. A minimum of %v bytes are required", HeaderSize)
 	}
 
 	return &Header{
@@ -61,12 +61,13 @@ func ParseHeader(bytes []byte) (*Header, error) {
 type ReliableUDPConn struct {
 	UDPConn net.UDPConn
 	//Address -> PacketId
-	NextPacketIDs map[string]uint32
-	//PacketId -> data
-	FuturePackets map[uint32][]byte
+	NextIncomingPacketIDs map[string]uint32
+	NextOutgoingPacketIDs map[string]uint32
+	//Address -> PacketId -> data
+	FutureIncomingPackets map[string]map[uint32][]byte
 }
 
-func (conn *ReliableUDPConn) ReadFrom(logLn func(string, ...any)) (buffer *[]byte, addr *net.UDPAddr, err error) {
+func (conn *ReliableUDPConn) ReadFrom(logLn func(string, ...any)) (packets *[][]byte, addr *net.Addr, err error) {
 	for {
 		buffer := make([]byte, 1024)
 		bytesRead, addr, err := conn.UDPConn.ReadFrom(buffer)
@@ -91,5 +92,50 @@ func (conn *ReliableUDPConn) ReadFrom(logLn func(string, ...any)) (buffer *[]byt
 			logLn("Received keep-alive packet from %v", addr.String())
 			continue
 		}
+
+		data := buffer[HeaderSize:bytesRead]
+
+		futurePackets := conn.FutureIncomingPackets[addr.String()]
+		nextPacketId := conn.NextIncomingPacketIDs[addr.String()]
+
+		if header.PacketId != nextPacketId {
+			if futurePackets != nil {
+				futurePackets[header.PacketId] = data
+			} else {
+				conn.FutureIncomingPackets[addr.String()] = map[uint32][]byte{header.PacketId: data}
+			}
+			continue
+		}
+
+		packets := [][]byte{data}
+
+		if futurePackets != nil {
+			var offset uint32 = 1
+			for {
+				packet := futurePackets[header.PacketId+offset]
+				if packet != nil {
+					delete(futurePackets, header.PacketId+offset)
+					packets = append(packets, packet)
+				} else {
+					break
+				}
+			}
+		}
+
+		conn.NextIncomingPacketIDs[addr.String()] = header.PacketId + 1
+
+		return &packets, &addr, nil
 	}
+}
+
+func (conn *ReliableUDPConn) WriteTo(data []byte, addr net.Addr, logLn func(string, ...any)) (int, error) {
+	packetId := conn.NextOutgoingPacketIDs[addr.String()]
+	conn.NextOutgoingPacketIDs[addr.String()] += 1
+
+	header := Header{
+		Version:  1,
+		PacketId: packetId,
+	}
+
+	return conn.UDPConn.WriteTo(append(header.ToBytes(), data...), addr)
 }

@@ -34,11 +34,13 @@ func Client(serverAddr net.UDPAddr, logLn func(string, ...any)) {
 	}
 	defer udpClientConn.Close()
 
+	reliableUDPConn := NewReliableUDPConn(*udpClientConn)
+
 	logLn("Listening on 0.0.0.0:%v", ClientTCPPort)
 
 	go func() {
 		for {
-			_, err := udpClientConn.Write([]byte(KeepAliveMessage))
+			_, err := reliableUDPConn.Write([]byte(KeepAliveMessage))
 			if err != nil {
 				logLn("Hole punch err: %v", err.Error())
 			}
@@ -90,7 +92,7 @@ func Client(serverAddr net.UDPAddr, logLn func(string, ...any)) {
 				if bytesRead == 0 {
 					break
 				}
-				udpClientConn.Write(buffer[0:bytesRead])
+				reliableUDPConn.Write(buffer[0:bytesRead])
 			}
 
 			stop <- true
@@ -106,24 +108,18 @@ func Client(serverAddr net.UDPAddr, logLn func(string, ...any)) {
 				default:
 				}
 
-				buffer := make([]byte, 1024)
-				bytesRead, err := udpClientConn.Read(buffer)
+				packets, err := reliableUDPConn.Read(logLn)
 				if err != nil {
 					logLn("Got error reading upd data: %v", err.Error())
 					if err.Error() == "EOF" {
 						break
 					}
 				}
-				if bytesRead == KeepAliveMessageLength && string(buffer[0:bytesRead]) == KeepAliveMessage {
-					logLn("Received keep-alive message")
-					continue
-				}
 
-				logLn("Read %v bytes from udp server", bytesRead)
-				if bytesRead == 0 {
-					break
+				logLn("Read %v packets from udp server", len(packets))
+				for _, packet := range packets {
+					conn.Write(packet)
 				}
-				conn.Write(buffer[0:bytesRead])
 			}
 
 			stop <- true

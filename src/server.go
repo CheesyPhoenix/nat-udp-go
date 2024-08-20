@@ -6,13 +6,13 @@ import (
 	"time"
 )
 
-const ServerUDPPort = 12345
+const ServerUDPPort = 12347
 const ServerTCPPort = 25565
 
-func StartHolePunch(conn net.UDPConn, addr net.UDPAddr, logLn func(string, ...any)) {
+func StartHolePunch(conn *ReliableUDPConn, addr net.UDPAddr, logLn func(string, ...any)) {
 	go func() {
 		for {
-			_, err := conn.WriteToUDP([]byte(KeepAliveMessage), &addr)
+			_, err := conn.WriteKeepAliveTo(&addr)
 			if err != nil {
 				logLn("Hole punch err: %v", err.Error())
 			}
@@ -22,7 +22,7 @@ func StartHolePunch(conn net.UDPConn, addr net.UDPAddr, logLn func(string, ...an
 	}()
 }
 
-func Server(conn net.UDPConn, logLn func(string, ...any)) {
+func Server(conn *ReliableUDPConn, logLn func(string, ...any)) {
 	logLn("Listening on 0.0.0.0:%v", ServerUDPPort)
 	logLn("Forwarding 127.0.0.1:%v", ServerTCPPort)
 
@@ -30,16 +30,12 @@ func Server(conn net.UDPConn, logLn func(string, ...any)) {
 	tcpConnections := new(sync.Map)
 
 	for {
-		buffer := make([]byte, 1024)
-		bytesRead, addr, err := conn.ReadFrom(buffer)
+		packets, addr, err := conn.ReadFrom(logLn)
 		if err != nil {
 			logLn("Got error reading from connection: %v", err.Error())
 		}
-		if bytesRead == KeepAliveMessageLength && string(buffer[0:bytesRead]) == KeepAliveMessage {
-			logLn("Received Keep-Alive message")
-			continue
-		}
-		logLn("Read %v bytes from udp client", bytesRead)
+
+		logLn("Read %v packets from udp client", len(packets))
 
 		val, ok := tcpConnections.Load(addr.String())
 		var tcpClientConn *net.TCPConn
@@ -77,9 +73,8 @@ func Server(conn net.UDPConn, logLn func(string, ...any)) {
 			tcpClientConn = *val.(**net.TCPConn)
 		}
 
-		tcpClientConn.Write(buffer[0:bytesRead])
-		if bytesRead > 0 {
-			logLn("From upd client: %v", string(buffer[0:bytesRead]))
+		for _, packet := range packets {
+			tcpClientConn.Write(packet)
 		}
 	}
 }

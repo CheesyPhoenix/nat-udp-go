@@ -120,6 +120,8 @@ func StartTUI() {
 				return
 			}
 
+			reliableConn := src.NewReliableUDPConn(*conn)
+
 			serverPage := tview.NewFlex()
 			serverPage.SetBorder(true).SetTitle("Server running")
 
@@ -142,7 +144,7 @@ func StartTUI() {
 						return
 					}
 
-					src.StartHolePunch(*conn, *addr, func(format string, a ...any) {
+					src.StartHolePunch(&reliableConn, *addr, func(format string, a ...any) {
 						str := fmt.Sprintf(format, a...) + "\n"
 						logView.Write([]byte(str))
 						log += str
@@ -169,7 +171,7 @@ func StartTUI() {
 			actionPages.AddAndSwitchToPage("server-page", serverPage, true)
 
 			go func() {
-				src.Server(*conn, func(format string, a ...any) {
+				src.Server(&reliableConn, func(format string, a ...any) {
 					str := fmt.Sprintf(format, a...) + "\n"
 					logView.Write([]byte(str))
 					log += str

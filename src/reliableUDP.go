@@ -67,7 +67,7 @@ type ReliableUDPConn struct {
 	FutureIncomingPackets map[string]map[uint32][]byte
 }
 
-func (conn *ReliableUDPConn) ReadFrom(logLn func(string, ...any)) (packets *[][]byte, addr *net.Addr, err error) {
+func (conn *ReliableUDPConn) ReadFrom(logLn func(string, ...any)) (packets [][]byte, addr net.Addr, err error) {
 	for {
 		buffer := make([]byte, 1024)
 		bytesRead, addr, err := conn.UDPConn.ReadFrom(buffer)
@@ -124,11 +124,24 @@ func (conn *ReliableUDPConn) ReadFrom(logLn func(string, ...any)) (packets *[][]
 
 		conn.NextIncomingPacketIDs[addr.String()] = header.PacketId + 1
 
-		return &packets, &addr, nil
+		return packets, addr, nil
 	}
 }
 
-func (conn *ReliableUDPConn) WriteTo(data []byte, addr net.Addr, logLn func(string, ...any)) (int, error) {
+func (conn *ReliableUDPConn) Read(logLn func(string, ...any)) (packets [][]byte, err error) {
+	for {
+		packets, addr, err := conn.ReadFrom(logLn)
+		if err != nil {
+			return nil, err
+		}
+		if (addr).String() != conn.UDPConn.RemoteAddr().String() {
+			continue
+		}
+		return packets, nil
+	}
+}
+
+func (conn *ReliableUDPConn) WriteTo(data []byte, addr net.Addr) (int, error) {
 	packetId := conn.NextOutgoingPacketIDs[addr.String()]
 	conn.NextOutgoingPacketIDs[addr.String()] += 1
 
@@ -138,4 +151,49 @@ func (conn *ReliableUDPConn) WriteTo(data []byte, addr net.Addr, logLn func(stri
 	}
 
 	return conn.UDPConn.WriteTo(append(header.ToBytes(), data...), addr)
+}
+
+func (conn *ReliableUDPConn) Write(data []byte) (int, error) {
+	packetId := conn.NextOutgoingPacketIDs[conn.UDPConn.RemoteAddr().String()]
+	conn.NextOutgoingPacketIDs[conn.UDPConn.RemoteAddr().String()] += 1
+
+	header := Header{
+		Version:  1,
+		PacketId: packetId,
+	}
+
+	return conn.UDPConn.Write(append(header.ToBytes(), data...))
+}
+
+func (conn *ReliableUDPConn) WriteKeepAliveTo(addr net.Addr) (int, error) {
+	header := Header{
+		Version:  1,
+		PacketId: 0,
+		Flags: Flags{
+			IsKeepAlive: true,
+		},
+	}
+
+	return conn.UDPConn.WriteTo(header.ToBytes(), addr)
+}
+
+func (conn *ReliableUDPConn) WriteKeepAlive() (int, error) {
+	header := Header{
+		Version:  1,
+		PacketId: 0,
+		Flags: Flags{
+			IsKeepAlive: true,
+		},
+	}
+
+	return conn.UDPConn.Write(header.ToBytes())
+}
+
+func NewReliableUDPConn(conn net.UDPConn) ReliableUDPConn {
+	return ReliableUDPConn{
+		UDPConn:               conn,
+		NextIncomingPacketIDs: make(map[string]uint32),
+		NextOutgoingPacketIDs: make(map[string]uint32),
+		FutureIncomingPackets: make(map[string]map[uint32][]byte),
+	}
 }

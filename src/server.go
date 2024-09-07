@@ -7,7 +7,7 @@ import (
 )
 
 const ServerUDPPort = 12347
-const ServerTCPPort = 25565
+const ServerTCPPort = 5173
 
 func StartHolePunch(conn *ReliableUDPConn, addr net.UDPAddr, logLn func(string, ...any)) {
 	go func() {

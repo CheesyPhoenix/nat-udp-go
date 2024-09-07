@@ -42,8 +42,7 @@ const CurrentVersion uint8 = 1
 
 func (header *Header) ToBytes() []byte {
 	res := []byte{byte(header.Version), header.Flags.ToByte()}
-	binary.BigEndian.AppendUint32(res, header.PacketId)
-	return res
+	return binary.BigEndian.AppendUint32(res, header.PacketId)
 }
 
 func ParseHeader(bytes []byte) (*Header, error) {
@@ -98,12 +97,15 @@ func (conn *ReliableUDPConn) ReadFrom(logLn func(string, ...any)) (packets [][]b
 		futurePackets := conn.FutureIncomingPackets[addr.String()]
 		nextPacketId := conn.NextIncomingPacketIDs[addr.String()]
 
+		logLn("packetID: %v, nextPacketId: %v, buffer: %v", header.PacketId, nextPacketId, buffer[:HeaderSize])
+
 		if header.PacketId != nextPacketId {
 			if futurePackets != nil {
 				futurePackets[header.PacketId] = data
 			} else {
 				conn.FutureIncomingPackets[addr.String()] = map[uint32][]byte{header.PacketId: data}
 			}
+			logLn("continue")
 			continue
 		}
 
@@ -116,13 +118,16 @@ func (conn *ReliableUDPConn) ReadFrom(logLn func(string, ...any)) (packets [][]b
 				if packet != nil {
 					delete(futurePackets, header.PacketId+offset)
 					packets = append(packets, packet)
+					offset++
 				} else {
 					break
 				}
 			}
 		}
 
-		conn.NextIncomingPacketIDs[addr.String()] = header.PacketId + 1
+		conn.NextIncomingPacketIDs[addr.String()] = header.PacketId + uint32(len(packets))
+
+		logLn("next: %v", header.PacketId+uint32(len(packets)))
 
 		return packets, addr, nil
 	}

@@ -8,8 +8,8 @@ import (
 const ClientUDPPort = 12345
 const ClientTCPPort = 12346
 
-const KeepAliveMessage = "UDP Hole Punch"
-const KeepAliveMessageLength = len(KeepAliveMessage)
+// const KeepAliveMessage = "UDP Hole Punch"
+// const KeepAliveMessageLength = len(KeepAliveMessage)
 
 func Client(serverAddr net.UDPAddr, logLn func(string, ...any)) {
 	tcpServerConn, err := net.ListenTCP("tcp4", &net.TCPAddr{
@@ -40,7 +40,7 @@ func Client(serverAddr net.UDPAddr, logLn func(string, ...any)) {
 
 	go func() {
 		for {
-			_, err := reliableUDPConn.Write([]byte(KeepAliveMessage))
+			_, err := reliableUDPConn.WriteKeepAlive()
 			if err != nil {
 				logLn("Hole punch err: %v", err.Error())
 			}

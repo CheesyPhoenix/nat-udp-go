@@ -36,7 +36,7 @@ func StartTUI() {
 	}
 	defer logFile.Close()
 
-	app := tview.NewApplication().EnableMouse(false).EnablePaste(true)
+	app := tview.NewApplication().EnableMouse(true).EnablePaste(true)
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {

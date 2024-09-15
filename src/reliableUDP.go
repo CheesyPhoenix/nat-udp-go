@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"sync"
 )
 
 type Flags struct {
@@ -64,6 +65,8 @@ type ReliableUDPConn struct {
 	NextOutgoingPacketIDs map[string]uint32
 	//Address -> PacketId -> data
 	FutureIncomingPackets map[string]map[uint32][]byte
+
+	mutex sync.Mutex
 }
 
 func (conn *ReliableUDPConn) ReadFrom(logLn func(string, ...any)) (packets [][]byte, addr net.Addr, err error) {
@@ -94,6 +97,7 @@ func (conn *ReliableUDPConn) ReadFrom(logLn func(string, ...any)) (packets [][]b
 
 		data := buffer[HeaderSize:bytesRead]
 
+		conn.mutex.Lock()
 		futurePackets := conn.FutureIncomingPackets[addr.String()]
 		nextPacketId := conn.NextIncomingPacketIDs[addr.String()]
 
@@ -106,6 +110,8 @@ func (conn *ReliableUDPConn) ReadFrom(logLn func(string, ...any)) (packets [][]b
 				conn.FutureIncomingPackets[addr.String()] = map[uint32][]byte{header.PacketId: data}
 			}
 			logLn("continue")
+
+			conn.mutex.Unlock()
 			continue
 		}
 
@@ -127,8 +133,9 @@ func (conn *ReliableUDPConn) ReadFrom(logLn func(string, ...any)) (packets [][]b
 
 		conn.NextIncomingPacketIDs[addr.String()] = header.PacketId + uint32(len(packets))
 
-		logLn("next: %v", header.PacketId+uint32(len(packets)))
+		logLn("next: %v. Addr: %v", header.PacketId+uint32(len(packets)), addr.String())
 
+		conn.mutex.Unlock()
 		return packets, addr, nil
 	}
 }
